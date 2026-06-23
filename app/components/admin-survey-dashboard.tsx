@@ -10,6 +10,7 @@ import {
   MessageSquareText,
   Sparkles,
   Star,
+  Trash2,
   X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -70,6 +71,8 @@ function DetailRow({ label, value }: DetailItem) {
 export function AdminSurveyDashboard({ submissions, loadError }: AdminSurveyDashboardProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<AdminSurveySubmission | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -86,6 +89,16 @@ export function AdminSurveyDashboard({ submissions, loadError }: AdminSurveyDash
     return undefined;
   }, [selected]);
 
+  function openSubmission(submission: AdminSurveySubmission) {
+    setDeleteError(null);
+    setSelected(submission);
+  }
+
+  function closeSubmission() {
+    setDeleteError(null);
+    setSelected(null);
+  }
+
   async function handleLogout() {
     await fetch("/api/admin/logout", {
       method: "POST",
@@ -93,6 +106,51 @@ export function AdminSurveyDashboard({ submissions, loadError }: AdminSurveyDash
     });
 
     router.refresh();
+  }
+
+  async function handleDeleteSelectedSubmission() {
+    if (!selected || isDeleting) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Delete this response? This cannot be undone."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const response = await fetch(`/api/admin/submissions/${selected.id}`, {
+        method: "DELETE",
+        headers: { Accept: "application/json" },
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | { message?: string }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(
+          payload?.message || "We could not delete this response right now."
+        );
+      }
+
+      closeSubmission();
+      router.refresh();
+    } catch (error) {
+      setDeleteError(
+        error instanceof Error
+          ? error.message
+          : "We could not delete this response right now."
+      );
+    } finally {
+      setIsDeleting(false);
+    }
   }
 
   const total = submissions.length;
@@ -216,7 +274,7 @@ export function AdminSurveyDashboard({ submissions, loadError }: AdminSurveyDash
               <button
                 key={submission.id}
                 type="button"
-                onClick={() => setSelected(submission)}
+                onClick={() => openSubmission(submission)}
                 className="group text-left"
               >
                 <Card className="h-full border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(255,255,255,0.82))] text-[#241a36] transition-transform duration-200 hover:-translate-y-1">
@@ -308,7 +366,7 @@ export function AdminSurveyDashboard({ submissions, loadError }: AdminSurveyDash
       {selected ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[#0b1020]/75 px-4 py-6 backdrop-blur-md"
-          onClick={() => setSelected(null)}
+          onClick={closeSubmission}
           role="presentation"
         >
           <div
@@ -334,19 +392,39 @@ export function AdminSurveyDashboard({ submissions, loadError }: AdminSurveyDash
                 </p>
               </div>
 
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setSelected(null)}
-                className="rounded-full bg-white/8 text-white hover:bg-white/15 hover:text-white"
-                aria-label="Close dialog"
-              >
-                <X className="size-4" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteSelectedSubmission}
+                  disabled={isDeleting}
+                  className="rounded-full border border-white/10 bg-[#ff4d6d]/15 text-[#ffb0bf] hover:bg-[#ff4d6d]/25 hover:text-white"
+                >
+                  <Trash2 className="size-4" />
+                  {isDeleting ? "Deleting..." : "Delete response"}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={closeSubmission}
+                  className="rounded-full bg-white/8 text-white hover:bg-white/15 hover:text-white"
+                  aria-label="Close dialog"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="max-h-[calc(92vh-92px)] overflow-y-auto p-5 sm:p-6">
+              {deleteError ? (
+                <div className="mb-5 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-50">
+                  {deleteError}
+                </div>
+              ) : null}
+
               <div className="mb-5 flex flex-wrap gap-2">
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ring-1 ${pickTone(

@@ -56,3 +56,11 @@ export async function getAdminSurveySubmissions() {
     source: submission.source ?? "",
   }));
 }
+
+export async function deleteAdminSurveySubmission(id: string) {
+  await connectToDatabase();
+
+  const deletedSubmission = await FeedbackSubmission.findByIdAndDelete(id);
+
+  return Boolean(deletedSubmission);
+}
