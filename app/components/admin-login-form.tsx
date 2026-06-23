@@ -9,7 +9,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function AdminLoginForm() {
+type AdminLoginFormProps = {
+  notice?: string | null;
+};
+
+export function AdminLoginForm({ notice }: AdminLoginFormProps) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -30,14 +34,22 @@ export function AdminLoginForm() {
         body: JSON.stringify({ password }),
       });
 
+      const payload = await response.json().catch(() => null);
+
       if (!response.ok) {
-        throw new Error("Invalid password.");
+        throw new Error(
+          typeof payload?.message === "string"
+            ? payload.message
+            : "That password did not work."
+        );
       }
 
       setPassword("");
       router.refresh();
-    } catch {
-      setError("That password did not work.");
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error ? caughtError.message : "That password did not work."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -51,6 +63,12 @@ export function AdminLoginForm() {
           <LockKeyhole className="size-3.5" />
           Admin access
         </div>
+
+        {notice ? (
+          <div className="rounded-2xl border border-amber-300/30 bg-amber-50/95 px-4 py-3 text-sm leading-6 text-amber-950 shadow-[0_12px_30px_rgba(0,0,0,0.12)]">
+            {notice}
+          </div>
+        ) : null}
 
         <Card className="border-white/10 bg-white/92 shadow-[0_24px_80px_rgba(10,12,24,0.35)]">
           <CardHeader className="gap-3">

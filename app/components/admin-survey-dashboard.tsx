@@ -20,6 +20,7 @@ import type { AdminSurveySubmission } from "@/lib/admin-submissions";
 
 type AdminSurveyDashboardProps = {
   submissions: AdminSurveySubmission[];
+  loadError?: string | null;
 };
 
 type DetailItem = {
@@ -66,7 +67,7 @@ function DetailRow({ label, value }: DetailItem) {
   );
 }
 
-export function AdminSurveyDashboard({ submissions }: AdminSurveyDashboardProps) {
+export function AdminSurveyDashboard({ submissions, loadError }: AdminSurveyDashboardProps) {
   const router = useRouter();
   const [selected, setSelected] = useState<AdminSurveySubmission | null>(null);
 
@@ -97,6 +98,7 @@ export function AdminSurveyDashboard({ submissions }: AdminSurveyDashboardProps)
   const total = submissions.length;
   const excellentCount = submissions.filter((submission) => submission.overallRating === "Excellent").length;
   const maybeCount = submissions.filter((submission) => submission.attendAgain === "Maybe").length;
+  const hasLoadError = Boolean(loadError);
 
   const details: DetailItem[] = selected
     ? [
@@ -149,6 +151,32 @@ export function AdminSurveyDashboard({ submissions }: AdminSurveyDashboardProps)
             </div>
           </div>
         </header>
+
+        {hasLoadError ? (
+          <section className="rounded-[1.75rem] border border-amber-300/30 bg-amber-50/95 p-5 text-amber-950 shadow-[0_24px_60px_rgba(8,10,18,0.16)]">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="max-w-3xl">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-700">
+                  Response load issue
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight">
+                  We could not load the survey responses
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-amber-900/80">
+                  {loadError}
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => router.refresh()}
+                className="h-11 rounded-full bg-amber-950 px-5 text-amber-50 hover:bg-amber-900"
+              >
+                Reload
+              </Button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-4 md:grid-cols-3">
           <Card className="border-white/10 bg-white/10 text-white shadow-[0_24px_60px_rgba(8,10,18,0.24)] backdrop-blur-xl">
@@ -264,10 +292,13 @@ export function AdminSurveyDashboard({ submissions }: AdminSurveyDashboardProps)
         ) : (
           <Card className="border-white/15 bg-white/10 text-white shadow-[0_24px_60px_rgba(8,10,18,0.24)] backdrop-blur-xl">
             <CardHeader>
-              <CardTitle className="text-2xl">No survey responses yet</CardTitle>
+              <CardTitle className="text-2xl">
+                {hasLoadError ? "Responses are temporarily unavailable" : "No survey responses yet"}
+              </CardTitle>
               <CardDescription className="text-white/68">
-                Once people start submitting feedback, each response will appear
-                here as a card.
+                {hasLoadError
+                  ? "Try reloading the page after checking the database connection."
+                  : "Once people start submitting feedback, each response will appear here as a card."}
               </CardDescription>
             </CardHeader>
           </Card>

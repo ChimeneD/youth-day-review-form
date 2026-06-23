@@ -1,8 +1,22 @@
-import { isAdminPassword, setAdminSessionCookie } from "@/lib/admin-auth";
+import {
+  isAdminAuthConfigured,
+  isAdminPassword,
+  setAdminSessionCookie,
+} from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  if (!isAdminAuthConfigured()) {
+    return Response.json(
+      {
+        message:
+          "Admin access is not configured on this server. Set ADMIN_PASSWORD and restart the app.",
+      },
+      { status: 503 }
+    );
+  }
+
   let body: unknown;
 
   try {
@@ -23,7 +37,17 @@ export async function POST(request: Request) {
     );
   }
 
-  await setAdminSessionCookie();
+  const sessionCreated = await setAdminSessionCookie();
+
+  if (!sessionCreated) {
+    return Response.json(
+      {
+        message:
+          "Admin access is not configured on this server. Set ADMIN_PASSWORD and restart the app.",
+      },
+      { status: 503 }
+    );
+  }
 
   return Response.json({ message: "Welcome back." }, { status: 200 });
 }

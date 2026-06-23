@@ -7,25 +7,39 @@ const ADMIN_COOKIE_NAME = "ydr_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 8;
 
 function getAdminPassword() {
-  const password = process.env.ADMIN_PASSWORD?.trim();
+  return process.env.ADMIN_PASSWORD?.trim() || null;
+}
 
-  if (!password) {
-    throw new Error("ADMIN_PASSWORD is missing from the environment.");
-  }
-
-  return password;
+export function isAdminAuthConfigured() {
+  return Boolean(getAdminPassword());
 }
 
 function signValue(value: string) {
-  return createHmac("sha256", getAdminPassword()).update(value).digest("hex");
+  const password = getAdminPassword();
+
+  if (!password) {
+    return null;
+  }
+
+  return createHmac("sha256", password).update(value).digest("hex");
 }
 
 function createSessionValue(expiresAt: number) {
   const payload = String(expiresAt);
-  return `${payload}.${signValue(payload)}`;
+  const signature = signValue(payload);
+
+  if (!signature) {
+    return null;
+  }
+
+  return `${payload}.${signature}`;
 }
 
 function isValidSessionValue(value: string | undefined) {
+  if (!getAdminPassword()) {
+    return false;
+  }
+
   if (!value) {
     return false;
   }
@@ -48,6 +62,10 @@ function isValidSessionValue(value: string | undefined) {
 
   const expectedSignature = signValue(expiresAtPart);
 
+  if (!expectedSignature) {
+    return false;
+  }
+
   if (expectedSignature.length !== signature.length) {
     return false;
   }
@@ -59,7 +77,13 @@ function isValidSessionValue(value: string | undefined) {
 }
 
 export function isAdminPassword(password: string) {
-  const expected = Buffer.from(getAdminPassword(), "utf8");
+  const expectedPassword = getAdminPassword();
+
+  if (!expectedPassword) {
+    return false;
+  }
+
+  const expected = Buffer.from(expectedPassword, "utf8");
   const provided = Buffer.from(password, "utf8");
 
   if (expected.length !== provided.length) {
@@ -70,6 +94,10 @@ export function isAdminPassword(password: string) {
 }
 
 export async function getAdminSession() {
+  if (!isAdminAuthConfigured()) {
+    return false;
+  }
+
   const cookieStore = await cookies();
   return isValidSessionValue(cookieStore.get(ADMIN_COOKIE_NAME)?.value);
 }
@@ -77,14 +105,21 @@ export async function getAdminSession() {
 export async function setAdminSessionCookie() {
   const cookieStore = await cookies();
   const expiresAt = Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000;
+  const sessionValue = createSessionValue(expiresAt);
 
-  cookieStore.set(ADMIN_COOKIE_NAME, createSessionValue(expiresAt), {
+  if (!sessionValue) {
+    return false;
+  }
+
+  cookieStore.set(ADMIN_COOKIE_NAME, sessionValue, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: ADMIN_SESSION_TTL_SECONDS,
   });
+
+  return true;
 }
 
 export async function clearAdminSessionCookie() {
